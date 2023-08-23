@@ -13,11 +13,19 @@ import android.os.Environment
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.rmd.education.learnenglish.databinding.ActivityMainBinding
+import okhttp3.Callback
+import okhttp3.Headers.Companion.headersOf
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.Response
 import java.io.File
-import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -60,36 +68,95 @@ class MainActivity : AppCompatActivity() {
             stopRecording()
         }
         binding.playBtn.setOnClickListener {
-            playRecord()
+            //playRecord()
+            prepareSendingToMS()
+            sendAudioFile()
         }
     }
 
-    private fun playRecord() {
-        // Initialize the MediaPlayer
-        mediaPlayer = MediaPlayer()
+    private fun sendAudioFile() {
+        val client = OkHttpClient()
 
-        try {
-            // Set the audio file you want to play
-            val audioFile = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                "recorded_audio.wav"
+        // Define the file path for recorded_audio.wav
+        val audioFile = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "recorded_audio.wav"
+        )
+
+        // Define the request URL
+        val url =
+            "https://eastus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1"
+
+        // Define the request headers
+        val headers = headersOf(
+            "Pronunciation-Assessment", "ewogICJSZWZlcmVuY2VUZXh0IjogIkhvdyBkbyBJIHJ1biB0aGlzIHByb2dyYW0iLAogICJHcmFkaW5nU3lzdGVtIjogIkh1bmRyZWRNYXJrIiwKICAiRGltZW5zaW9uIjogIkNvbXByZWhlbnNpdmUiCn0=",
+            "Granularity",
+            "Word"
+        )
+
+
+        // Create a multipart request builder
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart(
+                "file",
+                audioFile.name,
+                RequestBody.create("audio/wav".toMediaTypeOrNull(), audioFile)
             )
-            mediaPlayer.setDataSource(audioFile.absolutePath)
-            mediaPlayer.prepare()
-        } catch (e: IOException) {
-            Log.e(TAG, "Error setting data source: ${e.message}")
-        }
-        if (!mediaPlayer.isPlaying) {
-            mediaPlayer.start()
-            Toast.makeText(this, "Playing audio", Toast.LENGTH_SHORT).show()
-        }
-        mediaPlayer.setOnCompletionListener {
-            // This code runs when audio playback is completed
-            Toast.makeText(this, "Audio playback completed", Toast.LENGTH_SHORT).show()
-        }
+            .build()
 
+        // Create an OkHttp request
+        val request = Request.Builder()
+            .url(url)
+            .headers(headers)
+            .post(requestBody)
+            .build()
+
+        // Execute the request
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: okhttp3.Call, e: IOException) {
+                // Handle the failure
+                runOnUiThread {
+                    Toast.makeText(
+                        applicationContext,
+                        "Request failed: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+            override fun onResponse(call: okhttp3.Call, response: Response) {
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string()
+                    // Handle the successful response here
+                    runOnUiThread {
+                        Toast.makeText(applicationContext, responseBody, Toast.LENGTH_SHORT).show()
+                        Log.i(TAG,"$responseBody")
+                    }
+                } else {
+                    // Handle the error response here
+                    runOnUiThread {
+                        Toast.makeText(
+                            applicationContext,
+                            "Error: ${response.code} - ${response.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+        })
     }
 
+    private fun prepareSendingToMS() {
+        val pronAssessmentParamsJson =
+            "{\"ReferenceText\":\"Good morning.\",\"GradingSystem\":\"HundredMark\",\"Granularity\":\"FullText\",\"Dimension\":\"Comprehensive\"}"
+        val pronAssessmentParamsBytes = pronAssessmentParamsJson.toByteArray(Charsets.UTF_8)
+        val pronAssessmentHeader = android.util.Base64.encodeToString(
+            pronAssessmentParamsBytes,
+            android.util.Base64.DEFAULT
+        )
+        Log.d(TAG, "Base64 : $pronAssessmentHeader")
+    }
 
     private fun checkRecordPermission() {
         val result = ActivityCompat.checkSelfPermission(this, READ_MEDIA_AUDIO)
@@ -105,6 +172,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @RequiresPermission(value = "android.permission.RECORD_AUDIO")
     private fun initAudioRecorder() {
         audioRecord = AudioRecord(
             AUDIO_SOURCE,
@@ -117,7 +185,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startRecording() {
         //Now start the audio recording
-        initAudioRecorder()
+        checkRecordPermission()
         audioRecord.startRecording()
         isRecording = true
         Toast.makeText(this, "Recording started", Toast.LENGTH_SHORT).show()
@@ -173,13 +241,39 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
     private fun stopRecording() {
         isRecording = false
         audioRecord.stop()
         recordingThread?.join()
         audioRecord.release()
         Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun playRecord() {
+        // Initialize the MediaPlayer
+        mediaPlayer = MediaPlayer()
+        val audioFile = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "recorded_audio.wav"
+        )
+        try {
+            // Set the audio file you want to play
+
+            mediaPlayer.setDataSource(audioFile.absolutePath)
+            mediaPlayer.prepare()
+        } catch (e: IOException) {
+            Log.e(TAG, "Error setting data source: ${e.message}")
+        }
+        if (!mediaPlayer.isPlaying) {
+            mediaPlayer.start()
+            Toast.makeText(this, "Playing audio", Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "file recorded : ${audioFile.absolutePath}")
+        }
+        mediaPlayer.setOnCompletionListener {
+            // This code runs when audio playback is completed
+            Toast.makeText(this, "Audio playback completed", Toast.LENGTH_SHORT).show()
+        }
+
     }
 
     override fun onRequestPermissionsResult(
@@ -201,7 +295,6 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     )
                         .show()
-                    initAudioRecorder()
                 } else {
                     Toast.makeText(
                         applicationContext, "Denied : ToRecord = $permissionToRecord\n" +
@@ -212,6 +305,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
     override fun onDestroy() {
         super.onDestroy()
         mediaPlayer.release()
@@ -229,4 +323,6 @@ class MainActivity : AppCompatActivity() {
         const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
     }
+
+
 }
