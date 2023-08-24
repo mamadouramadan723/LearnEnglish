@@ -85,13 +85,15 @@ class MainActivity : AppCompatActivity() {
 
         // Define the request URL
         val url =
-            "https://eastus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1"
+            "https://eastus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US&format=detailed"
 
         // Define the request headers
         val headers = headersOf(
-            "Pronunciation-Assessment", "ewogICJSZWZlcmVuY2VUZXh0IjogIkhvdyBkbyBJIHJ1biB0aGlzIHByb2dyYW0iLAogICJHcmFkaW5nU3lzdGVtIjogIkh1bmRyZWRNYXJrIiwKICAiRGltZW5zaW9uIjogIkNvbXByZWhlbnNpdmUiCn0=",
+            "Pronunciation-Assessment",
+            "ewogICJSZWZlcmVuY2VUZXh0IjogIkhvdyBkbyBJIHJ1biB0aGlzIHByb2dyYW0iLAogICJHcmFkaW5nU3lzdGVtIjogIkh1bmRyZWRNYXJrIiwKICAiRGltZW5zaW9uIjogIkNvbXByZWhlbnNpdmUiCn0=",
             "Granularity",
-            "Word"
+            "Word",
+            "Ocp-Apim-Subscription-Key", "0e415183127541a48763789785c3dbe4" // Include your authorization key here
         )
 
 
@@ -122,6 +124,7 @@ class MainActivity : AppCompatActivity() {
                         "Request failed: ${e.message}",
                         Toast.LENGTH_SHORT
                     ).show()
+                    Log.i(TAG, "Request failed: ${e.message}")
                 }
             }
 
@@ -131,7 +134,7 @@ class MainActivity : AppCompatActivity() {
                     // Handle the successful response here
                     runOnUiThread {
                         Toast.makeText(applicationContext, responseBody, Toast.LENGTH_SHORT).show()
-                        Log.i(TAG,"$responseBody")
+                        Log.i(TAG, "$responseBody")
                     }
                 } else {
                     // Handle the error response here
@@ -141,6 +144,8 @@ class MainActivity : AppCompatActivity() {
                             "Error: ${response.code} - ${response.message}",
                             Toast.LENGTH_SHORT
                         ).show()
+                        Log.i(TAG, "Error: ${response.code} - ${response.message}")
+
                     }
                 }
             }
