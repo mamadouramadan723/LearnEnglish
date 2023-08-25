@@ -90,7 +90,7 @@ class ActivityMain : AppCompatActivity() {
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun startRecording() {
-        if (isRecording) return
+        //if (isRecording) return
 
         checkRecordPermission()
         audioRecord.startRecording()
@@ -155,11 +155,12 @@ class ActivityMain : AppCompatActivity() {
 
     private fun sendAudioFile() {
         // Create a logging interceptor
-        val loggingInterceptor = HttpLoggingInterceptor { message -> // Log the message to your preferred logging framework
-            Log.d("OkHttp", message)
-        }
+        val loggingInterceptor =
+            HttpLoggingInterceptor { message -> // Log the message to your preferred logging framework
+                Log.d("OkHttp", message)
+            }
 
-// Set the logging level (BODY includes request and response bodies)
+        // Set the logging level (BODY includes request and response bodies)
         loggingInterceptor.level = HttpLoggingInterceptor.Level.BODY
         val client = OkHttpClient()
             .newBuilder().addInterceptor(loggingInterceptor)
@@ -226,6 +227,37 @@ class ActivityMain : AppCompatActivity() {
         )
         Log.d(TAG, "Base64 : $pronAssessmentHeader")
     }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // this method is called when user will
+        // grant the permission for audio recording.
+        when (requestCode) {
+            REQUEST_PERMISSION_CODE -> if (grantResults.isNotEmpty()) {
+                val permissionToRecord = grantResults[0] == PackageManager.PERMISSION_GRANTED
+                val permissionToStore = grantResults[1] == PackageManager.PERMISSION_GRANTED
+                if (permissionToRecord && permissionToStore) {
+                    Toast.makeText(
+                        applicationContext,
+                        "Permission Granted : ${Environment.getExternalStorageDirectory().absolutePath}",
+                        Toast.LENGTH_LONG
+                    )
+                        .show()
+                } else {
+                    Toast.makeText(
+                        applicationContext, "Denied : ToRecord = $permissionToRecord\n" +
+                                "ToStore = $permissionToStore", Toast.LENGTH_LONG
+                    )
+                        .show()
+                }
+            }
+        }
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()

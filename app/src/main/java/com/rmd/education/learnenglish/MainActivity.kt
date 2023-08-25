@@ -17,12 +17,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.rmd.education.learnenglish.databinding.ActivityMainBinding
 import okhttp3.Callback
-import okhttp3.Headers.Companion.headersOf
+import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.Response
+import okhttp3.logging.HttpLoggingInterceptor
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -32,21 +33,6 @@ import java.util.Base64
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 class MainActivity : AppCompatActivity() {
-    private var isRecording = false
-    private var recordingThread: Thread? = null
-    private lateinit var audioRecord: AudioRecord
-    private lateinit var binding: ActivityMainBinding
-    private var pronAssessmentHeader: String = ""
-    private val bufferSize = AudioRecord.getMinBufferSize(
-        SAMPLE_RATE,
-        CHANNEL_CONFIG,
-        AUDIO_FORMAT
-    )
-    private val outputFile =
-        File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath,
-            "recorded_audio.wav"
-        )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -163,38 +149,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendAudioFile() {
+        // Create a logging interceptor
+        val loggingInterceptor =
+            HttpLoggingInterceptor { message -> // Log the message to your preferred logging framework
+                Log.d("OkHttp", message)
+            }
+
+
+        // Set the logging level (BODY includes request and response bodies)
+        loggingInterceptor.level = HttpLoggingInterceptor.Level.BODY
         val client = OkHttpClient()
-        /*.newBuilder()
-        .connectTimeout(20, TimeUnit.SECONDS) // Adjust the timeout as needed
-        .readTimeout(20, TimeUnit.SECONDS)    // Adjust the timeout as needed
-        .writeTimeout(20, TimeUnit.SECONDS)   // Adjust the timeout as needed
-        .build()*/
+            .newBuilder().addInterceptor(loggingInterceptor)
+            .build()
 
-        // Define the request URL
-        val url =
-            "https://eastus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US&format=detailed"
+        val headers = Headers.Builder()
+            .add("Pronunciation-Assessment", pronAssessmentHeader)
+            .add("Granularity", "Word")
+            .add("Ocp-Apim-Subscription-Key", getString(R.string.subscriptionKey))
+            .build()
 
-        // Define the request headers
-        val headers = headersOf(
-            "Pronunciation-Assessment",
-            pronAssessmentHeader,
-            "Granularity",
-            "Word",
-            "Ocp-Apim-Subscription-Key",
-            getString(R.string.subscriptionKey)
-        )
+        val requestBody =
+            outputFile.asRequestBody("audio/wav; codecs=audio/pcm; samplerate=16000".toMediaTypeOrNull())
 
-        // Define the request body with the .wav file
-        val requestBody = outputFile.asRequestBody("audio/wav".toMediaTypeOrNull())
-
-        // Create an OkHttp request
         val request = Request.Builder()
-            .url(url)
+            .url(URL)
             .headers(headers)
             .post(requestBody)
             .build()
 
-        // Execute the request
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
                 // Handle the failure
@@ -274,15 +256,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
+    // Declaration
     companion object {
-        const val REQUEST_PERMISSION_CODE = 101
-        const val TAG = "+++My Debug TAG : "
+        private const val REQUEST_PERMISSION_CODE = 101
+        private const val TAG = "+++My Debug TAG : "
 
-        const val SAMPLE_RATE = 44100
-        const val AUDIO_SOURCE = MediaRecorder.AudioSource.MIC
+        private const val SAMPLE_RATE = 44100
+        private const val AUDIO_SOURCE = MediaRecorder.AudioSource.MIC
+        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
+        private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
+        private const val RECORDED_AUDIO_FILE_NAME = "recorded_audio.wav"
+        private const val URL =
+            "https://eastus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US&format=detailed"
+    }
 
-        const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
-        const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
+    private var isRecording = false
+    private var pronAssessmentHeader: String = ""
+    private lateinit var audioRecord: AudioRecord
+    private var recordingThread: Thread? = null
+    private lateinit var binding: ActivityMainBinding
+    private val bufferSize = AudioRecord.getMinBufferSize(
+        SAMPLE_RATE,
+        CHANNEL_CONFIG,
+        AUDIO_FORMAT
+    )
+    private val outputFile: File by lazy {
+        File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            RECORDED_AUDIO_FILE_NAME
+        )
     }
 }
