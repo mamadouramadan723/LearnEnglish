@@ -1,11 +1,17 @@
 package com.rmd.education.learnenglish
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
@@ -21,6 +27,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
+import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 
@@ -73,8 +80,8 @@ class MyMainActivity : AppCompatActivity() {
     private fun initMediaRecorder() {
         mediaRecorder = MediaRecorder(this)
         mediaRecorder?.setAudioSource(MediaRecorder.AudioSource.MIC)
-        mediaRecorder?.setOutputFormat(MediaRecorder.OutputFormat.AAC_ADTS)
-        mediaRecorder?.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+        mediaRecorder?.setOutputFormat(MediaRecorder.OutputFormat.OGG)
+        mediaRecorder?.setAudioEncoder(MediaRecorder.AudioEncoder.OPUS)
         mediaRecorder?.setOutputFile(outputFilePath)
     }
 
@@ -113,12 +120,11 @@ class MyMainActivity : AppCompatActivity() {
 
         val headers = Headers.Builder()
             .add("Pronunciation-Assessment", pronAssessmentHeader)
-            .add("Granularity", "Word")
             .add("Ocp-Apim-Subscription-Key", getString(R.string.subscriptionKey))
             .build()
 
         val audioFile = File(outputFilePath)
-        val requestBody = audioFile.asRequestBody("audio/x-aac".toMediaTypeOrNull())
+        val requestBody = audioFile.asRequestBody("audio/ogg; codecs=opus".toMediaTypeOrNull())
 
         val request = Request.Builder()
             .url(URL)
@@ -140,12 +146,14 @@ class MyMainActivity : AppCompatActivity() {
             }
 
             override fun onResponse(call: okhttp3.Call, response: Response) {
-                val responseBody = response.body?.string()
+                responseBody = response.body?.string()
                 if (response.isSuccessful) {
                     // Handle the successful response here
                     runOnUiThread {
                         Toast.makeText(applicationContext, responseBody, Toast.LENGTH_SHORT).show()
                         Log.i(TAG, "body : $responseBody")
+                        //showScoreByWord()
+                        showScoreByPhonemes()
                     }
                 } else {
                     // Handle the error response here
@@ -162,9 +170,134 @@ class MyMainActivity : AppCompatActivity() {
         })
     }
 
+    private fun showScoreByWord() {
+
+        // Parse the JSON response into a JSONObject
+        val jsonObject = JSONObject(responseBody)
+
+        // Extract the NBest array
+        val nBestArray = jsonObject.getJSONArray("NBest")
+
+        // Assuming you want to work with the first item in the NBest array
+        val firstNBestItem = nBestArray.getJSONObject(0)
+
+        // Extract the Words array from the first NBest item
+        val wordsArray = firstNBestItem.getJSONArray("Words")
+
+        // Create a SpannableStringBuilder to build the formatted text
+        val formattedText = SpannableStringBuilder()
+
+        // Iterate through the words in the Words array
+        for (i in 0 until wordsArray.length()) {
+            val word = wordsArray.getJSONObject(i)
+            val displayText = word.getString("Word")
+            val accuracyScore = word.getDouble("AccuracyScore")
+
+            // Determine the color based on the accuracy score
+            val textColor = when {
+                accuracyScore >= 70.0 -> Color.GREEN
+                accuracyScore >= 50.0 -> Color.YELLOW
+                else -> Color.RED
+            }
+
+            // Create a span for the word with the specified color
+            val coloredText = SpannableString("$displayText ")
+
+            coloredText.setSpan(
+                ForegroundColorSpan(textColor),
+                0,
+                coloredText.length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+
+            // Append the colored word to the formatted text
+            formattedText.append(coloredText)
+        }
+
+        // Set the formatted text to the outputTv TextView
+        binding.outputTv.text = formattedText
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showScoreByPhonemes() {
+        try {
+            // Parse the JSON response into a JSONObject
+            val jsonObject = JSONObject(responseBody)
+
+            // Extract the NBest array
+            val nBestArray = jsonObject.getJSONArray("NBest")
+
+            // Assuming you want to work with the first item in the NBest array
+            val firstNBestItem = nBestArray.getJSONObject(0)
+
+            // Extract the Words array from the first NBest item
+            val wordsArray = firstNBestItem.getJSONArray("Words")
+
+            // Create a SpannableStringBuilder to build the formatted text
+            val formattedText = SpannableStringBuilder()
+
+            // Iterate through the elements in the JSONArray
+            for (i in 0 until wordsArray.length()) {
+                val word = wordsArray.getJSONObject(i)
+
+                // Check if the "Phonemes" key exists in the current word object
+                if (word.has("Phonemes")) {
+                    // Get the Phonemes array for the current word
+                    val phonemesArray = word.getJSONArray("Phonemes")
+
+                    // Create a SpannableStringBuilder for the current word
+                    val wordFormattedText = SpannableStringBuilder()
+
+                    // Iterate through the Phonemes array
+                    for (j in 0 until phonemesArray.length()) {
+                        val phoneme = phonemesArray.getJSONObject(j)
+
+                        // Extract the score for the current phoneme
+                        val accuracyScore = phoneme.getDouble("AccuracyScore")
+                        val phonemeText = phoneme.getString("Phoneme")
+
+                        // Determine the color based on the accuracy score
+                        val textColor = when {
+                            accuracyScore >= 70.0 -> Color.GREEN
+                            accuracyScore >= 50.0 -> Color.YELLOW
+                            else -> Color.RED
+                        }
+
+                        // Create a span for the phoneme with the specified color
+                        val coloredText = SpannableString(phonemeText)
+
+                        coloredText.setSpan(
+                            ForegroundColorSpan(textColor),
+                            0,
+                            coloredText.length,
+                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+
+                        // Append the colored phoneme to the word's formatted text
+                        wordFormattedText.append(coloredText)
+                    }
+
+                    // Append the word's formatted text (colored phonemes) to the overall formatted text
+                    formattedText.append(wordFormattedText).append(" ")
+                }
+            }
+
+            // Set the formatted text to the outputTv TextView
+            binding.outputTv.text = formattedText
+            Log.d(TAG, "$formattedText")
+        } catch (e: Exception) {
+            // Handle the case where responseBody is not valid JSON
+            e.printStackTrace()
+        }
+    }
+
     private fun prepareHeader() {
-        val pronAssessmentParamsJson =
-            "{\"ReferenceText\":\"Good morning.\",\"GradingSystem\":\"HundredMark\",\"Granularity\":\"FullText\",\"Dimension\":\"Comprehensive\"}"
+        val pronAssessmentParamsJson = "{\n" +
+                "\"ReferenceText\": \"How do I run this program?\",\n" +
+                "\"GradingSystem\": \"HundredMark\",\n" +
+                "\"Granularity\": \"Phoneme\",\n" +
+                "\"Dimension\": \"Comprehensive\"\n" +
+                "}"
         val pronAssessmentParamsBytes = pronAssessmentParamsJson.toByteArray(Charsets.UTF_8)
         pronAssessmentHeader = android.util.Base64.encodeToString(
             pronAssessmentParamsBytes,
@@ -217,6 +350,7 @@ class MyMainActivity : AppCompatActivity() {
 
         private var isRecording = false
         private var pronAssessmentHeader: String = ""
+        private var responseBody: String? = ""
 
     }
 
@@ -226,6 +360,6 @@ class MyMainActivity : AppCompatActivity() {
         if (!dir.exists()) {
             dir.mkdirs()
         }
-        "${dir.absolutePath}/recorded_audio.aac"
+        "${dir.absolutePath}/recorded_audio.ogg"
     }
 }

@@ -21,7 +21,7 @@
     <!--This will display the status of our app when
         we will record some audio and play that audio-->
     <TextView
-        android:id="@+id/idTVstatus"
+        android:id="@+id/statusTv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="50dp"
@@ -79,7 +79,7 @@
     </androidx.appcompat.widget.LinearLayoutCompat>
 
     <TextView
-        android:id="@+id/audioTv"
+        android:id="@+id/outputTv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="50dp"
