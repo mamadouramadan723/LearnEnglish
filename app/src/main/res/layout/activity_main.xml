@@ -1,89 +1,123 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     tools:context=".MainActivity">
 
-    <!--Heading Text View-->
-    <TextView
-        android:id="@+id/txthead"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:text="@string/audio_recorder"
-        android:textAlignment="center"
-        android:textColor="@color/black"
-        android:textSize="30sp" />
-
-    <!--This will display the status of our app when
-        we will record some audio and play that audio-->
-    <TextView
-        android:id="@+id/statusTv"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="50dp"
-        android:text="@string/status"
-        android:textAlignment="center"
-        android:textSize="18sp" />
-
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Space
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/recordBtn"
-            android:layout_width="wrap_content"
+        <!--Heading Text View-->
+        <TextView
+            android:id="@+id/txthead"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="0.25"
-            android:background="@drawable/rounded_button"
-            android:backgroundTint="@color/teal_200"
-            android:text="@string/start_recording"
-            tools:ignore="RtlSymmetry" />
-        <Space
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:layout_centerHorizontal="true"
+            android:text="@string/audio_recorder"
+            android:textAlignment="center"
+            android:textColor="@color/black"
+            android:textSize="30sp" />
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/playBtn"
-            android:layout_width="wrap_content"
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/text_edt"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="0.25"
-            android:background="@drawable/rounded_button"
-            android:backgroundTint="@color/teal_200"
-            android:text="@string/play_recording"
-            tools:ignore="RtlSymmetry" />
-        <Space
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:autofillHints="Write Your Text Here"
+            android:hint="@string/write" />
+        <!--This will display the status of our app when
+            we will record some audio and play that audio-->
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/stopBtn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="0.25"
-            android:background="@drawable/rounded_button"
-            android:backgroundTint="@color/teal_200"
-            android:text="@string/stop_recording"
-            tools:ignore="RtlSymmetry" />
 
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="25dp"
+            android:paddingBottom="25dp">
+
+            <Space
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/recordBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.25"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/teal_200"
+                android:text="@string/start_recording"
+                tools:ignore="RtlSymmetry" />
+
+            <Space
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/stopBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.25"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/teal_200"
+                android:text="@string/stop_recording"
+                tools:ignore="RtlSymmetry" />
+
+            <Space
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/playBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.25"
+                android:background="@drawable/rounded_button"
+                android:backgroundTint="@color/teal_200"
+                android:text="@string/show_score"
+                tools:ignore="RtlSymmetry" />
+
+            <Space
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <TextView
+            android:id="@+id/outputTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="50dp"
+            android:text="@string/score"
+            android:textAlignment="center"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/wordScoreTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="50dp"
+            android:text="@string/score"
+            android:textAlignment="center"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/phonemeScoreTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="50dp"
+            android:paddingTop="15dp"
+            android:text="@string/score"
+            android:textAlignment="center"
+            android:textSize="18sp" />
     </androidx.appcompat.widget.LinearLayoutCompat>
-
-    <TextView
-        android:id="@+id/outputTv"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="50dp"
-        android:text="@string/status"
-        android:textAlignment="center"
-        android:textSize="18sp" />
-</androidx.appcompat.widget.LinearLayoutCompat>
+</androidx.core.widget.NestedScrollView>

@@ -2,12 +2,16 @@ package com.rmd.education.learnenglish
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
@@ -31,24 +35,24 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 
+@SuppressLint("SetTextI18n")
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 class MyMainActivity : AppCompatActivity() {
-
-    private var mediaRecorder: MediaRecorder? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         checkRecordPermission()
         setupUI()
+        //speechRecognizerInit()
     }
 
     private fun setupUI() {
         binding.recordBtn.setOnClickListener {
             if (isRecording) {
-                stopRecording()
+                return@setOnClickListener
             } else {
                 startRecording()
             }
@@ -57,6 +61,10 @@ class MyMainActivity : AppCompatActivity() {
             stopRecording()
         }
         binding.playBtn.setOnClickListener {
+            if (binding.textEdt.text?.trim().isNullOrEmpty()) {
+                Toast.makeText(this, "Write Something to Send", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             prepareHeader()
             sendAudioFile()
         }
@@ -69,9 +77,7 @@ class MyMainActivity : AppCompatActivity() {
             initMediaRecorder()
         } else {
             ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.RECORD_AUDIO),
-                REQUEST_PERMISSION_CODE
+                this, arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_PERMISSION_CODE
             )
         }
     }
@@ -87,19 +93,29 @@ class MyMainActivity : AppCompatActivity() {
 
     private fun startRecording() {
         checkRecordPermission()
-        mediaRecorder?.prepare()
-        mediaRecorder?.start()
-        isRecording = true
-        Toast.makeText(this, "Recording started", Toast.LENGTH_SHORT).show()
+        try {
+            mediaRecorder?.prepare()
+            mediaRecorder?.start()
+            isRecording = true
+            binding.recordBtn.isActivated = false
+            Toast.makeText(this, "Recording started", Toast.LENGTH_SHORT).show()
+            // Start speech recognition
+            //startSpeechRecognition()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
     }
 
     private fun stopRecording() {
-        if (!isRecording) return
-
+        if (!isRecording) {
+            Toast.makeText(this, "Nothing is recorded", Toast.LENGTH_SHORT).show()
+            return
+        }
         mediaRecorder?.stop()
         mediaRecorder?.release()
         mediaRecorder = null
         isRecording = false
+        speechRecognizer.destroy()
         Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show()
     }
 
@@ -152,7 +168,7 @@ class MyMainActivity : AppCompatActivity() {
                     runOnUiThread {
                         Toast.makeText(applicationContext, responseBody, Toast.LENGTH_SHORT).show()
                         Log.i(TAG, "body : $responseBody")
-                        //showScoreByWord()
+                        showScoreByWord()
                         showScoreByPhonemes()
                     }
                 } else {
@@ -172,57 +188,61 @@ class MyMainActivity : AppCompatActivity() {
 
     private fun showScoreByWord() {
 
-        // Parse the JSON response into a JSONObject
-        val jsonObject = JSONObject(responseBody)
+        try {
 
-        // Extract the NBest array
-        val nBestArray = jsonObject.getJSONArray("NBest")
+            // Parse the JSON response into a JSONObject
+            val jsonObject = JSONObject(responseBody!!)
 
-        // Assuming you want to work with the first item in the NBest array
-        val firstNBestItem = nBestArray.getJSONObject(0)
+            // Extract the NBest array
+            val nBestArray = jsonObject.getJSONArray("NBest")
 
-        // Extract the Words array from the first NBest item
-        val wordsArray = firstNBestItem.getJSONArray("Words")
+            // Assuming you want to work with the first item in the NBest array
+            val firstNBestItem = nBestArray.getJSONObject(0)
 
-        // Create a SpannableStringBuilder to build the formatted text
-        val formattedText = SpannableStringBuilder()
+            // Extract the Words array from the first NBest item
+            val wordsArray = firstNBestItem.getJSONArray("Words")
 
-        // Iterate through the words in the Words array
-        for (i in 0 until wordsArray.length()) {
-            val word = wordsArray.getJSONObject(i)
-            val displayText = word.getString("Word")
-            val accuracyScore = word.getDouble("AccuracyScore")
+            // Create a SpannableStringBuilder to build the formatted text
+            val formattedText = SpannableStringBuilder()
 
-            // Determine the color based on the accuracy score
-            val textColor = when {
-                accuracyScore >= 70.0 -> Color.GREEN
-                accuracyScore >= 50.0 -> Color.YELLOW
-                else -> Color.RED
+            // Iterate through the words in the Words array
+            for (i in 0 until wordsArray.length()) {
+                val word = wordsArray.getJSONObject(i)
+                val displayText = word.getString("Word")
+                val accuracyScore = word.getDouble("AccuracyScore")
+
+                // Determine the color based on the accuracy score
+                val textColor = when {
+                    accuracyScore >= 70.0 -> Color.GREEN
+                    accuracyScore >= 50.0 -> Color.YELLOW
+                    else -> Color.RED
+                }
+
+                // Create a span for the word with the specified color
+                val coloredText = SpannableString("$displayText ")
+
+                coloredText.setSpan(
+                    ForegroundColorSpan(textColor),
+                    0,
+                    coloredText.length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+
+                // Append the colored word to the formatted text
+                formattedText.append(coloredText)
             }
 
-            // Create a span for the word with the specified color
-            val coloredText = SpannableString("$displayText ")
-
-            coloredText.setSpan(
-                ForegroundColorSpan(textColor),
-                0,
-                coloredText.length,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-
-            // Append the colored word to the formatted text
-            formattedText.append(coloredText)
+            // Set the formatted text to the outputTv TextView
+            binding.wordScoreTv.text = formattedText
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-
-        // Set the formatted text to the outputTv TextView
-        binding.outputTv.text = formattedText
     }
 
-    @SuppressLint("SetTextI18n")
     private fun showScoreByPhonemes() {
         try {
             // Parse the JSON response into a JSONObject
-            val jsonObject = JSONObject(responseBody)
+            val jsonObject = JSONObject(responseBody!!)
 
             // Extract the NBest array
             val nBestArray = jsonObject.getJSONArray("NBest")
@@ -283,17 +303,17 @@ class MyMainActivity : AppCompatActivity() {
             }
 
             // Set the formatted text to the outputTv TextView
-            binding.outputTv.text = formattedText
+            binding.phonemeScoreTv.text = formattedText
             Log.d(TAG, "$formattedText")
         } catch (e: Exception) {
-            // Handle the case where responseBody is not valid JSON
             e.printStackTrace()
         }
     }
 
     private fun prepareHeader() {
+        textToSend = binding.textEdt.text.toString()
         val pronAssessmentParamsJson = "{\n" +
-                "\"ReferenceText\": \"How do I run this program?\",\n" +
+                "\"ReferenceText\": \"$textToSend\",\n" +
                 "\"GradingSystem\": \"HundredMark\",\n" +
                 "\"Granularity\": \"Phoneme\",\n" +
                 "\"Dimension\": \"Comprehensive\"\n" +
@@ -303,7 +323,45 @@ class MyMainActivity : AppCompatActivity() {
             pronAssessmentParamsBytes,
             android.util.Base64.NO_WRAP
         )
-        Log.d(TAG, "Base64 : $pronAssessmentHeader")
+    }
+
+    private fun speechRecognizerInit() {
+        // Initialize SpeechRecognizer
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+
+            override fun onBeginningOfSpeech() {}
+
+            override fun onRmsChanged(rmsdB: Float) {}
+
+            override fun onBufferReceived(buffer: ByteArray?) {}
+
+            override fun onEndOfSpeech() {
+                // User has finished speaking, stop recording
+                if (isRecording) {
+                    stopRecording()
+                }
+            }
+
+            override fun onError(error: Int) {}
+
+            override fun onResults(results: Bundle?) {}
+
+            override fun onPartialResults(partialResults: Bundle?) {}
+
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+    }
+
+    private fun startSpeechRecognition() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        intent.putExtra(
+            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+        )
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        speechRecognizer.startListening(intent)
     }
 
     override fun onRequestPermissionsResult(
@@ -312,24 +370,15 @@ class MyMainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        // this method is called when user will
-        // grant the permission for audio recording.
         when (requestCode) {
             REQUEST_PERMISSION_CODE -> if (grantResults.isNotEmpty()) {
                 val permissionToRecord = grantResults[0] == PackageManager.PERMISSION_GRANTED
                 val permissionToStore = grantResults[1] == PackageManager.PERMISSION_GRANTED
                 if (permissionToRecord && permissionToStore) {
-                    Toast.makeText(
-                        applicationContext,
-                        "Permission Granted : ${Environment.getExternalStorageDirectory().absolutePath}",
-                        Toast.LENGTH_LONG
-                    )
+                    Toast.makeText(applicationContext, "Permission Granted", Toast.LENGTH_LONG)
                         .show()
                 } else {
-                    Toast.makeText(
-                        applicationContext, "Denied : ToRecord = $permissionToRecord\n" +
-                                "ToStore = $permissionToStore", Toast.LENGTH_LONG
-                    )
+                    Toast.makeText(applicationContext, "Permission Denied", Toast.LENGTH_LONG)
                         .show()
                 }
             }
@@ -342,19 +391,22 @@ class MyMainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val TAG = "TAG"
         private const val REQUEST_PERMISSION_CODE = 101
-        private const val TAG = "+++My Debug TAG : "
 
         private const val URL =
             "https://eastus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US&format=detailed"
 
         private var isRecording = false
-        private var pronAssessmentHeader: String = ""
+        private var textToSend: String? = ""
         private var responseBody: String? = ""
-
+        private var pronAssessmentHeader: String = ""
     }
 
+    private var mediaRecorder: MediaRecorder? = null
     private lateinit var binding: ActivityMainBinding
+    private lateinit var speechRecognizer: SpeechRecognizer
+
     private val outputFilePath: String by lazy {
         val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         if (!dir.exists()) {
